@@ -1,6 +1,29 @@
 <template>
   <div class="api-container">
-    <el-table :data="list" stripe style="width: 100%">
+    <el-form :inline="true" class="demo-form-inline">
+      <el-form-item>
+        <el-input v-model="searchObj.hosname" placeholder="医院名称" />
+      </el-form-item>
+      <el-form-item>
+        <el-input v-model="searchObj.hoscode" placeholder="医院编号" />
+      </el-form-item>
+      <el-button type="primary" icon="el-icon-search" @click="getList()"
+        >查询</el-button
+      >
+    </el-form>
+    <div>
+      <el-button type="danger" size="mini" @click="removeRows()"
+        >批量删除</el-button
+      >
+    </div>
+
+    <el-table
+      :data="list"
+      stripe
+      style="width: 100%"
+      @selection-change="handleSelectionChange"
+    >
+      <el-table-column type="selection" width="55" />
       <el-table-column type="index" width="50" />
       <el-table-column prop="hosname" label="医院名称" />
       <el-table-column prop="hoscode" label="医院编号" />
@@ -12,7 +35,26 @@
           {{ scope.row.status === 1 ? "可用" : "不可用" }}
         </template>
       </el-table-column>
+      <el-table-column label="操作" width="280" align="center">
+        <template slot-scope="scope">
+          <el-button
+            type="danger"
+            size="mini"
+            icon="el-icon-delete"
+            @click="removeDataById(scope.row.id)"
+          >
+          </el-button>
+        </template>
+      </el-table-column>
     </el-table>
+    <el-pagination
+      :current-page="current"
+      :page-size="limit"
+      :total="total"
+      style="padding: 30px 0; text-align: center"
+      layout="total, prev, pager, next, jumper"
+      @current-change="getList"
+    />
   </div>
 </template>
 
@@ -26,14 +68,67 @@ export default {
       limit: 3,
       searchObj: {},
       list: [],
-      total: 0
+      total: 0,
+      multipleSelection: [], // 批量选择中选择的记录列表
     };
   },
   created() {
     this.getList();
   },
   methods: {
-    getList() {
+    //批量删除
+    removeRows() {
+      this.$confirm("此操作将永久删除医院的设置信息, 是否继续?", "提示", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      }).then(() => {
+        //确定执行then方法
+        var idList = [];
+        //遍历数组得到每个id值，设置到idList里面
+        for (var i = 0; i < this.multipleSelection.length; i++) {
+          var obj = this.multipleSelection[i];
+          var id = obj.id;
+          idList.push(id);
+        }
+        //调用接口
+        hospset.batchRemoveHospSet(idList).then((response) => {
+          //提示
+          this.$message({
+            type: "success",
+            message: "删除成功!",
+          });
+          //刷新页面
+          this.getList(1);
+        });
+      });
+    },
+    // 当表格复选框选项发生变化的时候触发
+    handleSelectionChange(selection) {
+      this.multipleSelection = selection;
+    },
+
+    removeDataById(id) {
+      this.$confirm("此操作将永久删除医院的设置信息, 是否继续?", "提示", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      }).then(() => {
+        //确定执行then方法
+        //调用接口
+        hospset.deleteHospSet(id).then((response) => {
+          //提示
+          this.$message({
+            type: "success",
+            message: "删除成功!",
+          });
+          //刷新页面
+          this.getList(1);
+        });
+      });
+    },
+    getList(page = 1) {
+      this.current = page;
       hospset
         .getHospSetList(this.current, this.limit, this.searchObj)
         .then((res) => {
