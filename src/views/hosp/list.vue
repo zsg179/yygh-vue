@@ -1,170 +1,200 @@
 <template>
-  <div class="api-container">
+  <div class="app-container">
     <el-form :inline="true" class="demo-form-inline">
+      <el-form-item>
+        <el-select
+          v-model="searchObj.provinceCode"
+          placeholder="请选择省"
+          @change="provinceChanged"
+        >
+          <el-option
+            v-for="item in provinceList"
+            :key="item.id"
+            :label="item.name"
+            :value="item.id"
+          />
+        </el-select>
+      </el-form-item>
+
+      <el-form-item>
+        <el-select
+          v-model="searchObj.cityCode"
+          placeholder="请选择市"
+          @change="cityChanged"
+        >
+          <el-option
+            v-for="item in cityList"
+            :key="item.id"
+            :label="item.name"
+            :value="item.id"
+          />
+        </el-select>
+      </el-form-item>
+
       <el-form-item>
         <el-input v-model="searchObj.hosname" placeholder="医院名称" />
       </el-form-item>
-      <el-form-item>
-        <el-input v-model="searchObj.hoscode" placeholder="医院编号" />
-      </el-form-item>
-      <el-button type="primary" icon="el-icon-search" @click="getList()"
+
+      <el-button type="primary" icon="el-icon-search" @click="fetchData()"
         >查询</el-button
       >
+      <el-button type="default" @click="resetData()">清空</el-button>
     </el-form>
-    <div>
-      <el-button type="danger" size="mini" @click="removeRows()"
-        >批量删除</el-button
-      >
-    </div>
 
+    <!-- banner列表 -->
     <el-table
+      v-loading="listLoading"
       :data="list"
-      stripe
-      style="width: 100%"
-      @selection-change="handleSelectionChange"
+      border
+      fit
+      highlight-current-row
     >
-      <el-table-column type="selection" width="55" />
-      <el-table-column type="index" width="50" />
-      <el-table-column prop="hosname" label="医院名称" />
-      <el-table-column prop="hoscode" label="医院编号" />
-      <el-table-column prop="apiUrl" label="api基础路径" width="200" />
-      <el-table-column prop="contactsName" label="联系人姓名" />
-      <el-table-column prop="contactsPhone" label="联系人手机" />
-      <el-table-column label="状态" width="80">
+      <el-table-column label="序号" width="60" align="center">
         <template slot-scope="scope">
-          {{ scope.row.status === 1 ? "可用" : "不可用" }}
+          {{ (page - 1) * limit + scope.$index + 1 }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="280" align="center">
+
+      <el-table-column label="医院logo">
         <template slot-scope="scope">
+          <img
+            :src="'data:image/jpeg;base64,' + scope.row.logoData"
+            width="80"
+          />
+        </template>
+      </el-table-column>
+
+      <el-table-column prop="hosname" label="医院名称" />
+      <el-table-column prop="param.hostypeString" label="等级" width="90" />
+      <el-table-column prop="param.fullAddress" label="详情地址" />
+      <el-table-column label="状态" width="80">
+        <template slot-scope="scope">
+          {{ scope.row.status === 0 ? "未上线" : "已上线" }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="createTime" label="创建时间" />
+
+      <el-table-column label="操作" width="230" align="center">
+        <template slot-scope="scope">
+          <router-link :to="'/hospSet/hospital/show/' + scope.row.id">
+            <el-button type="primary" size="mini">查看</el-button>
+          </router-link>
+          <router-link :to="'/hospSet/hospital/schedule/' + scope.row.hoscode">
+            <el-button type="primary" size="mini">排班</el-button> 
+          </router-link> 
+
           <el-button
-            type="danger"
-            size="mini"
-            icon="el-icon-delete"
-            @click="removeDataById(scope.row.id)"
-            >删除
-          </el-button>
-           <el-button
             v-if="scope.row.status == 1"
             type="primary"
             size="mini"
-            icon="el-icon-delete"
-            @click="lockHostSet(scope.row.id, 0)"
-            >锁定</el-button
+            @click="updateStatus(scope.row.id, 0)"
+            >下线</el-button
           >
-                <el-button
+          <el-button
             v-if="scope.row.status == 0"
             type="danger"
             size="mini"
-            icon="el-icon-delete"
-            @click="lockHostSet(scope.row.id, 1)"
-            >取消锁定</el-button
+            @click="updateStatus(scope.row.id, 1)"
+            >上线</el-button
           >
-          <router-link :to="'/hospSet/edit/' + scope.row.id">
-               <el-button
-              type="primary"
-              size="mini"
-              icon="el-icon-edit"
-            >修改</el-button>
-          </router-link>
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 分页组件 -->
     <el-pagination
-      :current-page="current"
-      :page-size="limit"
+      :current-page="page"
       :total="total"
+      :page-size="limit"
+      :page-sizes="[5, 10, 20, 30, 40, 50, 100]"
       style="padding: 30px 0; text-align: center"
-      layout="total, prev, pager, next, jumper"
-      @current-change="getList"
+      layout="sizes, prev, pager, next, jumper, ->, total, slot"
+      @current-change="fetchData"
+      @size-change="changeSize"
     />
   </div>
 </template>
 
 <script>
-import hospset from "@/api/hospset";
+import hospitalApi from "@/api/hosp";
 export default {
   data() {
     return {
-      current: 1,
-      limit: 3,
-      searchObj: {},
-      list: [],
-      total: 0,
-      multipleSelection: [], // 批量选择中选择的记录列表
+      listLoading: true, // 数据是否正在加载
+      list: null, // banner列表
+      total: 0, // 数据库中的总记录数
+      page: 1, // 默认页码
+      limit: 10, // 每页记录数
+      searchObj: {}, // 查询表单对象
+      provinceList: [],
+      cityList: [],
+      districtList: [],
     };
   },
+
+  // 生命周期函数：内存准备完毕，页面尚未渲染
   created() {
-    this.getList();
+    console.log("list created......");
+    this.fetchData();
+
+    hospitalApi.findByDictCode("Province").then((response) => {
+      this.provinceList = response.data;
+    });
   },
+
   methods: {
-    lockHostSet(id, status) {
-      hospset.lockHospSet(id, status).then((response) => {
-        //刷新
-        this.getList(this.current);
+    updateStatus(id, status) {
+      hospitalApi.updateStatus(id, status).then((response) => {
+        this.fetchData(this.page);
       });
     },
-    //批量删除
-    removeRows() {
-      this.$confirm("此操作将永久删除医院的设置信息, 是否继续?", "提示", {
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
-        type: "warning",
-      }).then(() => {
-        //确定执行then方法
-        var idList = [];
-        //遍历数组得到每个id值，设置到idList里面
-        for (var i = 0; i < this.multipleSelection.length; i++) {
-          var obj = this.multipleSelection[i];
-          var id = obj.id;
-          idList.push(id);
-        }
-        //调用接口
-        hospset.batchRemoveHospSet(idList).then((response) => {
-          //提示
-          this.$message({
-            type: "success",
-            message: "删除成功!",
-          });
-          //刷新页面
-          this.getList(1);
+    // 加载banner列表数据
+    fetchData(page = 1) {
+      console.log("翻页。。。" + page);
+      // 异步获取远程数据（ajax）
+      this.page = page;
+      hospitalApi
+        .getPageList(this.page, this.limit, this.searchObj)
+        .then((response) => {
+          this.list = response.data.content;
+          this.total = response.data.totalElements;
+
+          // 数据加载并绑定成功
+          this.listLoading = false;
         });
+    },
+
+    // 当页码发生改变的时候
+    changeSize(size) {
+      console.log(size);
+      this.limit = size;
+      this.fetchData(1);
+    },
+
+    // 重置查询表单
+    resetData() {
+      console.log("重置查询表单");
+      this.searchObj = {};
+      this.fetchData();
+    },
+    provinceChanged() {
+      this.cityList = [];
+      this.searchObj.cityCode = null;
+      this.districtList = [];
+      this.searchObj.districtCode = null;
+      hospitalApi
+        .findByParentId(this.searchObj.provinceCode)
+        .then((response) => {
+          this.cityList = response.data;
+        });
+    },
+    cityChanged() {
+      this.districtList = [];
+      this.searchObj.districtCode = null;
+      hospitalApi.findByParentId(this.searchObj.cityCode).then((response) => {
+        this.districtList = response.data;
       });
-    },
-    // 当表格复选框选项发生变化的时候触发
-    handleSelectionChange(selection) {
-      this.multipleSelection = selection;
-    },
-    removeDataById(id) {
-      this.$confirm("此操作将永久删除医院的设置信息, 是否继续?", "提示", {
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
-        type: "warning",
-      }).then(() => {
-        //确定执行then方法
-        //调用接口
-        hospset.deleteHospSet(id).then((response) => {
-          //提示
-          this.$message({
-            type: "success",
-            message: "删除成功!",
-          });
-          //刷新页面
-          this.getList(1);
-        });
-      });
-    },
-    getList(page = 1) {
-      this.current = page;
-      hospset
-        .getHospSetList(this.current, this.limit, this.searchObj)
-        .then((res) => {
-          this.list = res.data.records;
-          this.total = res.data.total;
-        })
-        .catch((err) => {
-          console.log(err);
-        });
+      this.$forceUpdate();
     },
   },
 };

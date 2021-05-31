@@ -13,13 +13,13 @@ export default {
       url: `/admin/hosp/hospitalSet/${id}`,
       method: 'delete'
     })
-  },
+  }, 
   batchRemoveHospSet(idList) {
     return request({
       url: `/admin/hosp/hospitalSet/batchRemove`,
       method: 'delete',
       data: idList
-    })
+    }) 
   },
   //锁定和取消锁定
   lockHospSet(id, status) {

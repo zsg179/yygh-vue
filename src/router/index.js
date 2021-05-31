@@ -64,22 +64,44 @@ export const constantRoutes = [
       {
         path: 'list',
         name: '医院设置列表',
-        component: () => import('@/views/hosp/list'),
+        component: () => import('@/views/hospset/list'),
         meta: { title: '医院设置列表', icon: 'table' }
       },
       {
         path: 'add',
         name: '添加医院设置',
-        component: () => import('@/views/hosp/add'),
+        component: () => import('@/views/hospset/add'),
         meta: { title: '添加医院设置', icon: 'tree' }
       },
       {
         path: 'edit/:id',
         name: '编辑医院设置',
-        component: () => import('@/views/hosp/add'),
+        component: () => import('@/views/hospset/add'),
         meta: { title: '编辑', icon: 'tree' },
         hidden: true
+      },
+      {
+        path: 'hospital/list',
+        name: '医院列表',
+        component: () => import('@/views/hosp/list'),
+        meta: { title: '医院列表', icon: 'table' }
+      },
+      {
+        path: 'hospital/show/:id',
+        name: '查看',
+        component: () => import('@/views/hosp/show'),
+        meta: { title: '查看', noCache: true },
+        hidden: true
+      },
+      {
+        path: 'hospital/schedule/:hoscode',
+        name: '排班',
+        component: () => import('@/views/hosp/schedule'),
+        meta: { title: '排班', noCache: true },
+        hidden: true
       }
+
+
     ]
   },
   {
@@ -91,7 +113,7 @@ export const constantRoutes = [
     meta: { title: '数据管理', icon: 'el-icon-s-help' },
     children: [
       {
-        path: 'list', 
+        path: 'list',
         name: '数据字典',
         component: () => import('@/views/dict/list'),
         meta: { title: '数据字典', icon: 'table' }
